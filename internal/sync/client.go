@@ -22,14 +22,15 @@ import (
 )
 
 type JoinConfig struct {
-	Invite      string
-	LibraryPath string
-	Name        string
-	OutputPath  string
-	StateDir    string
-	Interval    time.Duration
-	Version     string
-	AudioRoot   string
+	ExcludePlaylists []string
+	Invite           string
+	LibraryPath      string
+	Name             string
+	OutputPath       string
+	StateDir         string
+	Interval         time.Duration
+	Version          string
+	AudioRoot        string
 }
 
 type clientState struct {
@@ -43,6 +44,7 @@ type clientState struct {
 }
 
 type syncClient struct {
+	excludePlaylists []string
 	http             *http.Client
 	state            clientState
 	statePath        string
@@ -109,7 +111,7 @@ func RunJoin(ctx context.Context, cfg JoinConfig) error {
 			return err
 		}
 	}
-	c := &syncClient{http: httpClient, state: state, statePath: statePath, library: cfg.LibraryPath, output: cfg.OutputPath, audio: audioManager}
+	c := &syncClient{http: httpClient, state: state, statePath: statePath, library: cfg.LibraryPath, output: cfg.OutputPath, audio: audioManager, excludePlaylists: cfg.ExcludePlaylists}
 	log.Printf("paired with room %s; writing merged library to %s", state.RoomID, cfg.OutputPath)
 	if err := c.pushIfChanged(ctx, true); err != nil {
 		return err
@@ -215,7 +217,7 @@ func (c *syncClient) pushIfChanged(ctx context.Context, force bool) error {
 	if !force && sum == c.lastSource {
 		return nil
 	}
-	b, err = preparePublishedSnapshot(b)
+	b, err = preparePublishedSnapshot(b, c.excludePlaylists...)
 	if err != nil {
 		return err
 	}
@@ -706,7 +708,7 @@ func responseError(resp *http.Response) error {
 	return fmt.Errorf("host returned %s", resp.Status)
 }
 
-func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager) error {
+func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager, exclusions ...string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -714,7 +716,7 @@ func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager
 	if len(b) > maxXMLBytes {
 		return errors.New("library XML exceeds the 128 MiB safety limit")
 	}
-	b, err = preparePublishedSnapshot(b)
+	b, err = preparePublishedSnapshot(b, exclusions...)
 	if err != nil {
 		return err
 	}
@@ -729,7 +731,7 @@ func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager
 	return r.update(peerID, name, b)
 }
 
-func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, interval time.Duration, audioManager *audio.Manager) error {
+func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, interval time.Duration, audioManager *audio.Manager, exclusions ...string) error {
 	initial, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -751,7 +753,7 @@ func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, in
 			if sum == last {
 				continue
 			}
-			b, err = preparePublishedSnapshot(b)
+			b, err = preparePublishedSnapshot(b, exclusions...)
 			if err != nil {
 				log.Printf("ignored invalid XML update: %v", err)
 				continue
@@ -775,7 +777,11 @@ func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, in
 	}
 }
 
-func preparePublishedSnapshot(data []byte) ([]byte, error) {
+func preparePublishedSnapshot(data []byte, exclusions ...string) ([]byte, error) {
+	data, err := library.ExcludePlaylistsXML(data, exclusions)
+	if err != nil {
+		return nil, err
+	}
 	clean, removed, err := library.StripManagedPlaylistRootsXML(data)
 	if err != nil {
 		return nil, err

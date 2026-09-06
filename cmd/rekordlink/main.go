@@ -218,6 +218,8 @@ func runHost(args []string) error {
 
 func runHostMode(args []string, showInvite bool) error {
 	fs := flag.NewFlagSet("host", flag.ContinueOnError)
+	var exclusions []string
+	fs.Func("exclude-playlist", "exclude a folder/playlist path and its tracks (repeatable; e.g. /Jay)", func(path string) error { exclusions = append(exclusions, path); return nil })
 	libraryPath := fs.String("library", "", "path to a rekordbox XML export")
 	name := fs.String("name", "", "DJ display name")
 	output := fs.String("output", "", "merged XML output path")
@@ -245,21 +247,24 @@ func runHostMode(args []string, showInvite bool) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return rlsync.RunHost(ctx, rlsync.HostConfig{
-		LibraryPath: *libraryPath,
-		Name:        *name,
-		OutputPath:  *output,
-		StateDir:    *state,
-		ListenAddr:  *listen,
-		Advertise:   *advertise,
-		Interval:    *interval,
-		Version:     version,
-		AudioRoot:   *audioRoot,
-		ShowInvite:  showInvite,
+		ExcludePlaylists: exclusions,
+		LibraryPath:      *libraryPath,
+		Name:             *name,
+		OutputPath:       *output,
+		StateDir:         *state,
+		ListenAddr:       *listen,
+		Advertise:        *advertise,
+		Interval:         *interval,
+		Version:          version,
+		AudioRoot:        *audioRoot,
+		ShowInvite:       showInvite,
 	})
 }
 
 func runJoin(args []string) error {
 	fs := flag.NewFlagSet("join", flag.ContinueOnError)
+	var exclusions []string
+	fs.Func("exclude-playlist", "exclude a folder/playlist path and its tracks (repeatable; e.g. /Jay)", func(path string) error { exclusions = append(exclusions, path); return nil })
 	invite := fs.String("invite", "", "rekordlink:// invite printed by the host")
 	libraryPath := fs.String("library", "", "path to a rekordbox XML export")
 	name := fs.String("name", "", "DJ display name")
@@ -286,14 +291,15 @@ func runJoin(args []string) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	return rlsync.RunJoin(ctx, rlsync.JoinConfig{
-		Invite:      *invite,
-		LibraryPath: *libraryPath,
-		Name:        *name,
-		OutputPath:  *output,
-		StateDir:    *state,
-		Interval:    *interval,
-		Version:     version,
-		AudioRoot:   *audioRoot,
+		ExcludePlaylists: exclusions,
+		Invite:           *invite,
+		LibraryPath:      *libraryPath,
+		Name:             *name,
+		OutputPath:       *output,
+		StateDir:         *state,
+		Interval:         *interval,
+		Version:          version,
+		AudioRoot:        *audioRoot,
 	})
 }
 
