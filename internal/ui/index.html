@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>RekordLink</title>
+  <style>
+    :root { --bg:#0a0b0e; --panel:#121419; --panel2:#171a20; --line:#282c35; --text:#f4f5f7; --muted:#979daa; --cyan:#48e1d1; --cyan2:#20a99c; --green:#63e6a6; --amber:#ffc65a; --red:#ff6b78; --shadow:0 18px 54px rgba(0,0,0,.36); }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(circle at 15% -5%,rgba(72,225,209,.11),transparent 30%),var(--bg); color:var(--text); font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; min-height:100vh; }
+    header { height:66px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; padding:0 28px; background:rgba(10,11,14,.82); backdrop-filter:blur(16px); position:sticky; top:0; z-index:3; }
+    .brand { display:flex; align-items:center; gap:11px; font-weight:740; letter-spacing:-.02em; font-size:18px; }
+    .mark { width:30px; height:30px; border-radius:9px; display:grid; place-items:center; background:linear-gradient(145deg,var(--cyan),#7d8cff); color:#07100f; box-shadow:0 0 26px rgba(72,225,209,.25); }
+    .version { color:var(--muted); font-size:12px; font-weight:500; }
+    .live { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+    .dot { width:8px; height:8px; border-radius:50%; background:#555b67; box-shadow:0 0 0 4px rgba(85,91,103,.12); }
+    .dot.running,.dot.ready { background:var(--green); box-shadow:0 0 0 4px rgba(99,230,166,.12); }
+    .dot.attention { background:var(--amber); box-shadow:0 0 0 4px rgba(255,198,90,.12); }
+    main { width:min(1160px,calc(100% - 36px)); margin:34px auto 70px; }
+    .hero { display:flex; justify-content:space-between; align-items:end; gap:24px; margin-bottom:22px; }
+    h1 { margin:0; font-size:31px; letter-spacing:-.045em; line-height:1.1; }
+    .subtitle { color:var(--muted); margin:8px 0 0; max-width:650px; }
+    .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+    .card { background:linear-gradient(180deg,rgba(24,27,33,.96),rgba(16,18,23,.96)); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); overflow:hidden; }
+    .wide { grid-column:1/-1; }
+    .card-head { display:flex; justify-content:space-between; align-items:center; padding:19px 21px; border-bottom:1px solid var(--line); }
+    .card-head h2 { margin:0; font-size:15px; letter-spacing:-.01em; }
+    .card-body { padding:21px; }
+    .status-title { display:flex; align-items:center; gap:10px; font-size:25px; font-weight:720; letter-spacing:-.035em; }
+    .pill { display:inline-flex; align-items:center; border:1px solid var(--line); border-radius:100px; padding:4px 9px; color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+    .metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:20px; }
+    .metric { background:var(--panel2); border:1px solid var(--line); padding:13px; border-radius:11px; }
+    .metric b { display:block; font-size:19px; }
+    .metric span { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.06em; }
+    .message { color:var(--muted); min-height:42px; margin:10px 0 0; }
+    .actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:18px; }
+    button { appearance:none; border:1px solid var(--line); border-radius:9px; padding:9px 13px; color:var(--text); background:#20242b; font:inherit; font-weight:620; cursor:pointer; transition:.15s ease; }
+    button:hover { border-color:#414753; transform:translateY(-1px); }
+    button:disabled { opacity:.38; cursor:not-allowed; transform:none; }
+    button.primary { color:#061110; background:var(--cyan); border-color:var(--cyan); }
+    button.primary:hover { background:#68eadc; }
+    button.danger { color:#ff9da5; }
+    button.ghost { background:transparent; }
+    form { display:grid; gap:19px; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .field { display:grid; gap:7px; min-width:0; }
+    .field.full { grid-column:1/-1; }
+    label { color:#cdd0d7; font-size:12px; font-weight:650; }
+    input,select { width:100%; border:1px solid var(--line); border-radius:9px; background:#0d0f13; color:var(--text); padding:10px 11px; font:inherit; outline:none; }
+    input:focus,select:focus { border-color:var(--cyan2); box-shadow:0 0 0 3px rgba(72,225,209,.1); }
+    .path { display:flex; gap:8px; }
+    .path input { min-width:0; }
+    .path button { flex:0 0 auto; }
+    .check { display:flex; gap:10px; align-items:flex-start; background:rgba(72,225,209,.055); border:1px solid rgba(72,225,209,.18); padding:13px; border-radius:10px; }
+    .check input { width:16px; margin-top:3px; accent-color:var(--cyan); }
+    .check label { font-weight:500; color:#dfe3e8; }
+    small { display:block; color:var(--muted); margin-top:2px; }
+    details { border-top:1px solid var(--line); padding-top:16px; }
+    summary { color:var(--muted); cursor:pointer; font-weight:620; }
+    pre { margin:0; height:235px; overflow:auto; background:#090a0d; border:1px solid #22262d; border-radius:10px; padding:14px; color:#b9c1cc; font:12px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace; white-space:pre-wrap; word-break:break-word; }
+    .toast { position:fixed; right:22px; bottom:22px; max-width:420px; padding:12px 15px; border-radius:10px; background:#22272f; border:1px solid #3b424e; box-shadow:var(--shadow); transform:translateY(18px); opacity:0; pointer-events:none; transition:.2s; z-index:9; }
+    .toast.show { transform:none; opacity:1; }
+    .toast.error { border-color:rgba(255,107,120,.55); color:#ffc5ca; }
+    .hidden { display:none !important; }
+    @media(max-width:760px){ header{padding:0 18px} main{width:min(100% - 24px,680px);margin-top:24px}.grid{grid-template-columns:1fr}.wide{grid-column:auto}.hero{align-items:start;flex-direction:column}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.metrics{grid-template-columns:1fr 1fr}.metric:last-child{grid-column:1/-1} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="mark">R</span>RekordLink <span class="version" id="version"></span></div>
+    <div class="live"><span class="dot" id="header-dot"></span><span id="header-state">Loading…</span></div>
+  </header>
+  <main>
+    <section class="hero"><div><h1>Your duo, in sync.</h1><p class="subtitle">Manage the background agent, verify the merged rekordbox library, and change connection settings without touching the command line.</p></div><button class="ghost" id="refresh">Refresh</button></section>
+    <section class="grid">
+      <article class="card">
+        <div class="card-head"><h2>Background agent</h2><span class="pill" id="mode-pill">Not configured</span></div>
+        <div class="card-body">
+          <div class="status-title"><span class="dot" id="service-dot"></span><span id="service-state">Checking</span></div>
+          <p class="message" id="service-message">Reading the per-user service state.</p>
+          <div class="actions">
+            <button id="start">Start</button><button id="stop">Stop</button><button id="restart">Restart</button><button id="copy-invite" class="hidden">Copy invite</button><button class="danger" id="remove">Remove service</button>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-head"><h2>Local library guarantee</h2><span class="pill" id="receipt-pill">Waiting</span></div>
+        <div class="card-body">
+          <div class="status-title"><span class="dot" id="receipt-dot"></span><span id="receipt-state">Waiting</span></div>
+          <p class="message" id="receipt-message">Waiting for the first complete synchronization.</p>
+          <div class="metrics"><div class="metric"><b id="tracks">—</b><span>Tracks</span></div><div class="metric"><b id="playlists">—</b><span>Playlists</span></div><div class="metric"><b id="audio">—</b><span>Audio local</span></div></div>
+        </div>
+      </article>
+      <article class="card wide">
+        <div class="card-head"><h2>Connection setup</h2><span class="pill">Stored privately</span></div>
+        <div class="card-body">
+          <form id="setup-form">
+            <div class="form-grid">
+              <div class="field"><label for="mode">This computer</label><select id="mode"><option value="host">DJ A — direct host</option><option value="join">DJ B — join host or relay</option><option value="relay">Always-on relay</option></select></div>
+              <div class="field dj"><label for="name">DJ display name</label><input id="name" autocomplete="off" placeholder="DJ name"></div>
+              <div class="field full dj"><label for="library">rekordbox XML Auto Export</label><div class="path"><input id="library" autocomplete="off" placeholder="/absolute/path/rekordbox.xml"><button type="button" data-pick="file" data-target="library">Choose</button></div></div>
+              <div class="field full dj"><label for="output">Merged XML output</label><input id="output" autocomplete="off" placeholder="Defaults beside the source XML"><small>Choose this file in rekordbox Preferences → Bridge.</small></div>
+              <div class="field full join hidden"><label for="invite">Private RekordLink invite</label><input id="invite" type="password" autocomplete="off" placeholder="Paste invite; leave blank to keep the saved invite"><small id="invite-note"></small></div>
+              <div class="field full"><div class="check"><input id="allow-audio" type="checkbox" checked><label for="allow-audio"><b>Synchronize local audio files</b><small>I confirm both DJs are allowed to copy the referenced files. Disable only for a metadata-only room.</small></label></div></div>
+              <div class="field full dj" id="audio-field"><label for="audio-root">Managed audio folder</label><div class="path"><input id="audio-root" autocomplete="off" placeholder="/absolute/path/RekordLink Audio"><button type="button" data-pick="directory" data-target="audio-root">Choose</button></div><small>All synchronized audio and its bulk cache are stored beneath this folder.</small></div>
+            </div>
+            <details><summary>Network and timing</summary><div class="form-grid" style="margin-top:16px"><div class="field host relay"><label for="listen">Sync listen address</label><input id="listen" value=":9777"></div><div class="field host relay"><label for="advertise">Direct address advertised to partner</label><input id="advertise" placeholder="Private IP or directly reachable hostname"></div><div class="field relay"><label for="public-endpoint">Public HTTPS relay URL</label><input id="public-endpoint" placeholder="https://rekordlink.example.com"><small>Use this for a Cloudflare Tunnel; leave the direct address blank.</small></div><div class="field dj"><label for="interval">Scan interval</label><input id="interval" value="2s" placeholder="2s"></div></div></details>
+            <div class="actions"><button class="primary" type="submit" id="save">Save and run in background</button></div>
+          </form>
+        </div>
+      </article>
+      <article class="card wide">
+        <div class="card-head"><h2>Recent agent log</h2><button class="ghost" id="refresh-logs">Refresh log</button></div>
+        <div class="card-body"><pre id="logs">Loading service log…</pre></div>
+      </article>
+    </section>
+  </main>
+  <div class="toast" id="toast"></div>
+  <script>
+    const csrf='{{CSRF}}';
+    const $=id=>document.getElementById(id);
+    let configured=false,currentMode='';
+    async function api(path,options={}){ options.headers={...(options.headers||{}),'X-RekordLink-CSRF':csrf}; const response=await fetch(path,options); const data=await response.json().catch(()=>({error:'Invalid response from local agent'})); if(!response.ok) throw new Error(data.error||response.statusText); return data; }
+    function toast(message,error=false){ const el=$('toast'); el.textContent=message; el.className='toast show'+(error?' error':''); clearTimeout(el.timer); el.timer=setTimeout(()=>el.className='toast',4200); }
+    function visibleMode(){ const mode=$('mode').value; document.querySelectorAll('.host,.join,.relay').forEach(el=>el.classList.add('hidden')); document.querySelectorAll('.'+mode).forEach(el=>el.classList.remove('hidden')); document.querySelectorAll('.dj').forEach(el=>el.classList.toggle('hidden',mode==='relay')); updateAudio(); }
+    function updateAudio(){ $('audio-field').classList.toggle('hidden',$('mode').value==='relay'||!$('allow-audio').checked); }
+    function fill(c){ if(!c) return; ['mode','name','library','output','audio_root','listen','advertise','public_endpoint','interval'].forEach(k=>{const el=$(k.replace('_','-'));if(el&&c[k]!==undefined&&c[k]!=='')el.value=c[k]}); $('allow-audio').checked=c.allow_audio; $('invite-note').textContent=c.invite_configured?'A saved invite is configured. Leave this field blank to keep it.':''; visibleMode(); }
+    async function refresh(){ try { const s=await api('/api/state'); configured=s.service.configured; currentMode=s.config?.mode||''; $('version').textContent='v'+s.version; $('mode-pill').textContent=currentMode||'Not configured'; $('service-state').textContent=s.service.running?'Running':(s.service.configured?'Stopped':'Not configured'); $('service-message').textContent=s.service.running?'Sync checks continue automatically in the background.':(s.service.configured?'Your settings are saved; start the agent to resume synchronization.':'Complete setup below to install the per-user background agent.'); $('service-dot').className='dot '+(s.service.running?'running':''); $('header-dot').className='dot '+(s.service.running?'running':''); $('header-state').textContent=s.service.running?'Background sync active':$('service-state').textContent; $('start').disabled=!configured||s.service.running; $('stop').disabled=!configured||!s.service.running; $('restart').disabled=!configured; $('remove').disabled=!configured; $('copy-invite').classList.toggle('hidden',!configured||!['host','relay'].includes(currentMode)); const r=s.receipt; $('receipt-state').textContent=r.state; $('receipt-pill').textContent=r.state; $('receipt-message').textContent=r.message||''; $('receipt-dot').className='dot '+(r.state==='READY'?'ready':(r.state==='WAITING'?'':'attention')); $('tracks').textContent=r.tracks||'—'; $('playlists').textContent=r.playlists||'—'; $('audio').textContent=r.audio_total ? r.audio_ready+'/'+r.audio_total : (r.state==='READY'?'0/0':'—'); if(s.config&&!document.activeElement.matches('input,select')) fill(s.config); } catch(e){toast(e.message,true)} }
+    async function logs(){ try{$('logs').textContent=(await api('/api/logs')).logs}catch(e){$('logs').textContent=e.message} }
+    async function control(action){ if(action==='remove'&&!confirm('Remove the background service? Synced XML and audio files will remain.'))return; try{const d=await api('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});toast(d.message);setTimeout(()=>{refresh();logs()},650)}catch(e){toast(e.message,true)} }
+    async function copyInvite(){try{const value=(await api('/api/invite')).invite;if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(value)}else{const field=document.createElement('textarea');field.value=value;field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();document.execCommand('copy');field.remove()}toast('Private invite copied. Send it directly to your DJ partner.')}catch(e){toast(e.message,true)}}
+    $('setup-form').addEventListener('submit',async e=>{e.preventDefault();const body={mode:$('mode').value,name:$('name').value,library:$('library').value,output:$('output').value,audio_root:$('audio-root').value,allow_audio:$('allow-audio').checked,invite:$('invite').value,listen:$('listen').value,advertise:$('advertise').value,public_endpoint:$('public-endpoint').value,interval:$('interval').value};$('save').disabled=true;try{const d=await api('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('invite').value='';toast(d.message);setTimeout(()=>{refresh();logs()},800)}catch(err){toast(err.message,true)}finally{$('save').disabled=false}});
+    document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{try{const d=await api('/api/pick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:b.dataset.pick})});$(b.dataset.target).value=d.path}catch(e){if(!e.message.includes('cancelled'))toast(e.message,true)}}));
+    $('mode').addEventListener('change',visibleMode);$('allow-audio').addEventListener('change',updateAudio);$('start').onclick=()=>control('start');$('stop').onclick=()=>control('stop');$('restart').onclick=()=>control('restart');$('copy-invite').onclick=copyInvite;$('remove').onclick=()=>control('remove');$('refresh').onclick=refresh;$('refresh-logs').onclick=logs;
+    visibleMode();refresh();logs();setInterval(refresh,5000);setInterval(logs,12000);
+  </script>
+</body>
+</html>

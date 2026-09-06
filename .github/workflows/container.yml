@@ -1,0 +1,78 @@
+name: container
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve release version
+        id: version
+        run: echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Validate Compose configuration
+        run: docker compose --env-file .env.example config --quiet
+      - name: Smoke-test relay image
+        env:
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          set -eu
+          docker build --build-arg VERSION="$VERSION" --tag rekordlink-relay:test .
+          docker run --detach --name rekordlink-relay-test \
+            --env REKORDLINK_ADVERTISE=127.0.0.1 \
+            rekordlink-relay:test
+          trap 'docker rm --force rekordlink-relay-test >/dev/null 2>&1 || true' EXIT
+          i=0
+          while [ "$i" -lt 30 ]; do
+            state="$(docker inspect --format '{{.State.Health.Status}}' rekordlink-relay-test)"
+            [ "$state" = healthy ] && break
+            [ "$state" = unhealthy ] && exit 1
+            i=$((i + 1))
+            sleep 1
+          done
+          [ "$(docker inspect --format '{{.State.Health.Status}}' rekordlink-relay-test)" = healthy ]
+          docker exec rekordlink-relay-test test -s /data/invite.txt
+          if docker logs rekordlink-relay-test 2>&1 | grep --quiet 'rekordlink://join/'; then
+            echo "private invite leaked into container logs" >&2
+            exit 1
+          fi
+          docker run --rm rekordlink-relay:test version | grep --quiet "$VERSION"
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: VERSION=${{ steps.version.outputs.value }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true

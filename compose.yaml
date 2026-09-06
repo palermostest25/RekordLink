@@ -1,0 +1,33 @@
+name: rekordlink
+
+services:
+  relay:
+    image: rekordlink-relay:${REKORDLINK_VERSION:-0.4.5}
+    build:
+      context: .
+      args:
+        VERSION: ${REKORDLINK_VERSION:-0.4.5}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      REKORDLINK_ADVERTISE: ${REKORDLINK_ADVERTISE:?Set REKORDLINK_ADVERTISE in .env}
+      REKORDLINK_LISTEN: ":9777"
+      REKORDLINK_STATE: "/data"
+      REKORDLINK_METADATA_ONLY: "${REKORDLINK_METADATA_ONLY:-false}"
+      REKORDLINK_LOG_INVITE: "${REKORDLINK_LOG_INVITE:-false}"
+    ports:
+      - "${REKORDLINK_BIND_IP:?Set REKORDLINK_BIND_IP in .env}:9777:9777/tcp"
+    volumes:
+      - relay-data:/data
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    stop_grace_period: 15s
+
+volumes:
+  relay-data:

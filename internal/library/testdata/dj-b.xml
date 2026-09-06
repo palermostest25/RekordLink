@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<DJ_PLAYLISTS Version="1.0.0">
+  <PRODUCT Name="rekordbox" Version="7.2.17" Company="AlphaTheta"/>
+  <COLLECTION Entries="2">
+    <TRACK TrackID="77" Name="First Track" Artist="Artist" Size="1000" TotalTime="180" AverageBpm="127.99" Comments="B version" Location="file://localhost/C:/Music/first.mp3">
+      <POSITION_MARK Name="MIX OUT" Type="0" Start="140.000" Num="1"/>
+    </TRACK>
+    <TRACK TrackID="78" Name="Only B" Artist="Beta" Size="3000" TotalTime="210" Location="file://localhost/C:/Music/only-b.mp3"/>
+  </COLLECTION>
+  <PLAYLISTS><NODE Type="0" Name="ROOT" Count="1"><NODE Type="0" Name="Shows" Count="1"><NODE Type="1" Name="B Set" Entries="2" KeyType="0"><TRACK Key="77"/><TRACK Key="78"/></NODE></NODE></NODE></PLAYLISTS>
+</DJ_PLAYLISTS>

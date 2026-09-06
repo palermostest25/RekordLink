@@ -1,0 +1,54 @@
+name: rekordlink-cloudflare
+
+services:
+  relay:
+    image: rekordlink-relay:${REKORDLINK_VERSION:-0.4.5}
+    build:
+      context: .
+      args:
+        VERSION: ${REKORDLINK_VERSION:-0.4.5}
+    restart: unless-stopped
+    init: true
+    read_only: true
+    environment:
+      REKORDLINK_PUBLIC_ENDPOINT: ${REKORDLINK_PUBLIC_ENDPOINT:?Set REKORDLINK_PUBLIC_ENDPOINT in .env.cloudflare}
+      REKORDLINK_LISTEN: ":9777"
+      REKORDLINK_STATE: "/data"
+      REKORDLINK_METADATA_ONLY: "${REKORDLINK_METADATA_ONLY:-false}"
+      REKORDLINK_LOG_INVITE: "${REKORDLINK_LOG_INVITE:-false}"
+    expose:
+      - "9777"
+    volumes:
+      - relay-data:/data
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    stop_grace_period: 15s
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run
+    restart: unless-stopped
+    read_only: true
+    environment:
+      TUNNEL_TOKEN_FILE: /run/secrets/cloudflare_tunnel_token
+    secrets:
+      - cloudflare_tunnel_token
+    depends_on:
+      relay:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  relay-data:
+
+secrets:
+  cloudflare_tunnel_token:
+    file: ${CLOUDFLARE_TUNNEL_TOKEN_FILE:-./.cloudflare-tunnel-token}
