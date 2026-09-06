@@ -33,6 +33,48 @@ rekordlink ui
 
 The dashboard provides the complete first-run setup, native file/folder selection where the operating system supports it, service controls, private invite copying for hosts/relays, recent logs, and the current `READY`/`INCOMPLETE` library receipt. It listens only on the local loopback interface; it is not a remote administration console.
 
+## Share everything except selected folders or playlists
+
+In the dashboard, use **Share everything except… → Choose folders / playlists**.
+The list comes from your selected rekordbox XML export. Check the folders or
+playlists to exclude, then choose **Save and run in background**. Export again
+from rekordbox first if newly created folders are not listed.
+
+For example, exclude your imported **Jay** folder and your **Private** folder.
+Your partner independently excludes your imported folder on their computer.
+Everything else, including new tracks and tracks outside playlists, remains
+shared automatically. A folder exclusion covers all descendants. An excluded
+track is removed from the outgoing collection and from every outgoing playlist,
+even if it also appears outside the excluded folder. Duplicate records pointing
+to the same file location are withheld together; independent copies at different
+locations are separate tracks and should each be included in an excluded playlist
+if you want to withhold them.
+
+Exclusions apply **before audio preparation or upload**, in both audio and
+metadata-only modes, on hosts and joining clients. They do not remove anything
+from your rekordbox Collection, stop local analysis or playback, block USB
+export, or filter incoming tracks shared by your partner. The existing automatic
+filter for top-level `RekordLink` playlist trees still applies.
+
+CLI and background-service commands accept repeated flags:
+
+```text
+--exclude-playlist '/Jay' --exclude-playlist '/Private'
+```
+
+Paths are exact and case-sensitive, starting at the playlist root: for example,
+`/My Sets/Unreleased`. A literal `/` inside a folder name is written `~1`, and a
+literal `~` is written `~0`. The dashboard handles this automatically. Exclusions
+are saved locally with the service arguments. Clearing all selections restores
+the default share-all behavior (apart from the managed playlist-tree filter).
+
+If a configured path is missing or renamed, publication stops with an error
+instead of silently sharing its former contents. Refresh your export and review
+the saved exclusions to resume publication. Exclusions cannot retract files or
+metadata already received by your partner; previously uploaded relay blobs and
+older snapshots remain until separately removed or replaced. Do not rely on
+exclusion as deletion of previously shared material.
+
 ## The seamlessness boundary
 
 AlphaTheta provides two official mechanisms that make the safe workflow possible:

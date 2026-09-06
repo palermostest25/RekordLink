@@ -37,31 +37,33 @@ type Options struct {
 }
 
 type setupRequest struct {
-	Mode           string `json:"mode"`
-	Name           string `json:"name"`
-	Library        string `json:"library"`
-	Output         string `json:"output"`
-	AudioRoot      string `json:"audio_root"`
-	AllowAudio     bool   `json:"allow_audio"`
-	Invite         string `json:"invite"`
-	Listen         string `json:"listen"`
-	Advertise      string `json:"advertise"`
-	PublicEndpoint string `json:"public_endpoint"`
-	Interval       string `json:"interval"`
+	ExcludePlaylists []string `json:"exclude_playlists"`
+	Mode             string   `json:"mode"`
+	Name             string   `json:"name"`
+	Library          string   `json:"library"`
+	Output           string   `json:"output"`
+	AudioRoot        string   `json:"audio_root"`
+	AllowAudio       bool     `json:"allow_audio"`
+	Invite           string   `json:"invite"`
+	Listen           string   `json:"listen"`
+	Advertise        string   `json:"advertise"`
+	PublicEndpoint   string   `json:"public_endpoint"`
+	Interval         string   `json:"interval"`
 }
 
 type configView struct {
-	Mode             string `json:"mode"`
-	Name             string `json:"name,omitempty"`
-	Library          string `json:"library,omitempty"`
-	Output           string `json:"output,omitempty"`
-	AudioRoot        string `json:"audio_root,omitempty"`
-	AllowAudio       bool   `json:"allow_audio"`
-	InviteConfigured bool   `json:"invite_configured"`
-	Listen           string `json:"listen,omitempty"`
-	Advertise        string `json:"advertise,omitempty"`
-	PublicEndpoint   string `json:"public_endpoint,omitempty"`
-	Interval         string `json:"interval,omitempty"`
+	ExcludePlaylists []string `json:"exclude_playlists"`
+	Mode             string   `json:"mode"`
+	Name             string   `json:"name,omitempty"`
+	Library          string   `json:"library,omitempty"`
+	Output           string   `json:"output,omitempty"`
+	AudioRoot        string   `json:"audio_root,omitempty"`
+	AllowAudio       bool     `json:"allow_audio"`
+	InviteConfigured bool     `json:"invite_configured"`
+	Listen           string   `json:"listen,omitempty"`
+	Advertise        string   `json:"advertise,omitempty"`
+	PublicEndpoint   string   `json:"public_endpoint,omitempty"`
+	Interval         string   `json:"interval,omitempty"`
 }
 
 type receiptView struct {
@@ -111,6 +113,7 @@ func Run(ctx context.Context, opts Options) error {
 	mux.HandleFunc("GET /api/logs", s.logs)
 	mux.HandleFunc("GET /api/invite", s.invite)
 	mux.HandleFunc("POST /api/setup", s.setup)
+	mux.HandleFunc("POST /api/playlists", s.playlists)
 	mux.HandleFunc("POST /api/control", s.control)
 	mux.HandleFunc("POST /api/pick", s.pick)
 
@@ -297,6 +300,43 @@ func (s *server) setup(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]string{"message": "Configuration saved and background sync started."}, http.StatusOK)
 }
 
+// playlists reads the selected export without installing or changing a service.
+func (s *server) playlists(w http.ResponseWriter, r *http.Request) {
+	var request struct {
+		Library string `json:"library"`
+	}
+	if err := decodeJSON(w, r, &request); err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	path, err := absolutePath(request.Library)
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	defer f.Close()
+	data, err := io.ReadAll(io.LimitReader(f, (128<<20)+1))
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	if len(data) > 128<<20 {
+		writeError(w, errors.New("library XML exceeds the 128 MiB safety limit"), http.StatusBadRequest)
+		return
+	}
+	lib, err := library.Parse(data)
+	if err != nil {
+		writeError(w, err, http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, map[string]any{"playlists": library.PlaylistPaths(lib)}, http.StatusOK)
+}
+
 func (s *server) control(w http.ResponseWriter, r *http.Request) {
 	var request struct {
 		Action string `json:"action"`
@@ -383,6 +423,9 @@ func buildServiceArgs(request setupRequest) (string, []string, error) {
 	if _, err := library.Parse(data); err != nil {
 		return "", nil, fmt.Errorf("validate library XML: %w", err)
 	}
+	if _, err := library.ExcludePlaylistsXML(data, request.ExcludePlaylists); err != nil {
+		return "", nil, err
+	}
 	output := strings.TrimSpace(request.Output)
 	if output == "" {
 		output = filepath.Join(filepath.Dir(libraryPath), "rekordlink-shared.xml")
@@ -395,6 +438,9 @@ func buildServiceArgs(request setupRequest) (string, []string, error) {
 		return "", nil, errors.New("output XML must not overwrite the source library XML")
 	}
 	args := []string{"--name", name, "--library", libraryPath, "--output", output}
+	for _, path := range request.ExcludePlaylists {
+		args = append(args, "--exclude-playlist", path)
+	}
 	if request.AllowAudio {
 		audioRoot, err := absolutePath(request.AudioRoot)
 		if err != nil {
@@ -439,6 +485,7 @@ func absolutePath(value string) (string, error) {
 
 func viewConfig(cfg service.Config) configView {
 	view := configView{
+		ExcludePlaylists: options(cfg.Args, "--exclude-playlist"),
 		Mode:             cfg.Command,
 		Name:             option(cfg.Args, "--name"),
 		Library:          option(cfg.Args, "--library"),
@@ -467,6 +514,19 @@ func option(args []string, name string) string {
 		}
 	}
 	return ""
+}
+
+func options(args []string, name string) []string {
+	values := []string{}
+	for i := 0; i < len(args); i++ {
+		if args[i] == name && i+1 < len(args) {
+			values = append(values, args[i+1])
+			i++
+		} else if strings.HasPrefix(args[i], name+"=") {
+			values = append(values, strings.TrimPrefix(args[i], name+"="))
+		}
+	}
+	return values
 }
 
 func hasOption(args []string, name string) bool {

@@ -33,16 +33,17 @@ const (
 )
 
 type HostConfig struct {
-	LibraryPath string
-	Name        string
-	OutputPath  string
-	StateDir    string
-	ListenAddr  string
-	Advertise   string
-	Interval    time.Duration
-	Version     string
-	AudioRoot   string
-	ShowInvite  bool
+	ExcludePlaylists []string
+	LibraryPath      string
+	Name             string
+	OutputPath       string
+	StateDir         string
+	ListenAddr       string
+	Advertise        string
+	Interval         time.Duration
+	Version          string
+	AudioRoot        string
+	ShowInvite       bool
 }
 
 type RelayConfig struct {
@@ -99,7 +100,7 @@ func RunHost(ctx context.Context, cfg HostConfig) error {
 			return err
 		}
 	}
-	if err := publishFile(r, hostID, cfg.Name, cfg.LibraryPath, audioManager); err != nil {
+	if err := publishFile(r, hostID, cfg.Name, cfg.LibraryPath, audioManager, cfg.ExcludePlaylists...); err != nil {
 		return fmt.Errorf("initial library: %w", err)
 	}
 	certPath, keyPath, fingerprint, err := ensureCertificate(cfg.StateDir)
@@ -149,7 +150,7 @@ func RunHost(ctx context.Context, cfg HostConfig) error {
 		errCh <- httpServer.ListenAndServeTLS(certPath, keyPath)
 	}()
 	go func() {
-		errCh <- watchAndPublish(ctx, r, hostID, cfg.Name, cfg.LibraryPath, cfg.Interval, audioManager)
+		errCh <- watchAndPublish(ctx, r, hostID, cfg.Name, cfg.LibraryPath, cfg.Interval, audioManager, cfg.ExcludePlaylists...)
 	}()
 	go func() { errCh <- writeCombinedLoop(ctx, r, hostID, cfg.OutputPath, cfg.Interval, audioManager) }()
 

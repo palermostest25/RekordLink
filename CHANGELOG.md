@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Added a dashboard folder/playlist picker for sharing everything except selected paths, plus repeatable `--exclude-playlist` flags for hosts and joining clients.
+- Applied exclusions before audio preparation and publication, including metadata-only mode. Descendant playlists, their collection tracks, same-location duplicate records, and references from other playlists are withheld; unfiled tracks remain shared.
+- Persisted exclusions in background-service settings and blocked publication when a selected path disappears, preventing renamed folders from silently becoming shared.
+- Kept exclusions outbound-only: local Collection entries, analysis, playback, USB export, and incoming partner tracks remain available.
+- Added tests for nested paths, escaped names, overlapping playlists, service settings, and real relay uploads that verify excluded audio is never cached or uploaded.
+
 ## 0.4.5 - 2026-09-06
 
 - Added a managed-playlist publication boundary: an imported top-level `RekordLink` tree is derived output and is no longer sent back as original source input.
