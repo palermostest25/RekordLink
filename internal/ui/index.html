@@ -108,6 +108,14 @@
               <div class="field full"><div class="check"><input id="allow-audio" type="checkbox" checked><label for="allow-audio"><b>Synchronize local audio files</b><small>I confirm both DJs are allowed to copy the referenced files. Disable only for a metadata-only room.</small></label></div></div>
               <div class="field full dj" id="audio-field"><label for="audio-root">Managed audio folder</label><div class="path"><input id="audio-root" autocomplete="off" placeholder="/absolute/path/RekordLink Audio"><button type="button" data-pick="directory" data-target="audio-root">Choose</button></div><small>All synchronized audio and its bulk cache are stored beneath this folder.</small></div>
             </div>
+            <section class="field dj" aria-labelledby="shared-heading">
+              <h3 id="shared-heading">Build one shared Duo Library</h3>
+              <small>Select the normal local playlist or folder where you add music for the duo. Your partner selects theirs. RekordLink combines both into one generated <b>Duo Library</b> playlist for you both to import.</small>
+              <div><button type="button" id="load-shared-playlists">Choose my contribution playlist</button></div>
+              <div id="shared-list"></div>
+              <small id="shared-summary" role="status">No contribution playlist selected.</small>
+              <small>Edit the selected original playlist under rekordbox Playlists. Treat the generated RekordLink → Duo Library playlist as read-only. Additions from both DJs are kept; removing a track from your contribution removes only your copy of that contribution.</small>
+            </section>
             <section class="field dj" aria-labelledby="exclusion-heading">
               <h3 id="exclusion-heading">Share everything except…</h3>
               <small>Choose rekordbox folders or playlists to keep out of outgoing sync, such as Jay or Private. Their tracks stay in your Collection for playback, analysis and USB export.</small>
@@ -131,18 +139,18 @@
   <script>
     const csrf='{{CSRF}}';
     const $=id=>document.getElementById(id);
-    let configured=false,currentMode='',formDirty=false,excluded=new Set(),playlistChoices=[];
+    let configured=false,currentMode='',formDirty=false,excluded=new Set(),shared=new Set(),playlistChoices=[];
     async function api(path,options={}){ options.headers={...(options.headers||{}),'X-RekordLink-CSRF':csrf}; const response=await fetch(path,options); const data=await response.json().catch(()=>({error:'Invalid response from local agent'})); if(!response.ok) throw new Error(data.error||response.statusText); return data; }
     function toast(message,error=false){ const el=$('toast'); el.textContent=message; el.className='toast show'+(error?' error':''); clearTimeout(el.timer); el.timer=setTimeout(()=>el.className='toast',4200); }
     function visibleMode(){ const mode=$('mode').value; document.querySelectorAll('.host,.join,.relay').forEach(el=>el.classList.add('hidden')); document.querySelectorAll('.'+mode).forEach(el=>el.classList.remove('hidden')); document.querySelectorAll('.dj').forEach(el=>el.classList.toggle('hidden',mode==='relay')); updateAudio(); }
     function updateAudio(){ $('audio-field').classList.toggle('hidden',$('mode').value==='relay'||!$('allow-audio').checked); }
-    function fill(c){ if(!c) return; const saved=c.exclude_playlists||[]; if(saved.length!==excluded.size||saved.some(p=>!excluded.has(p))){excluded=new Set(saved);renderExclusions();} updateExclusionSummary(); ['mode','name','library','output','audio_root','listen','advertise','public_endpoint','interval'].forEach(k=>{const el=$(k.replace('_','-'));if(el&&c[k]!==undefined&&c[k]!=='')el.value=c[k]}); $('allow-audio').checked=c.allow_audio; $('invite-note').textContent=c.invite_configured?'A saved invite is configured. Leave this field blank to keep it.':''; visibleMode(); }
+    function fill(c){ if(!c) return; const saved=c.exclude_playlists||[],savedShared=c.shared_playlists||[]; if(saved.length!==excluded.size||saved.some(p=>!excluded.has(p))){excluded=new Set(saved);renderExclusions();} if(savedShared.length!==shared.size||savedShared.some(p=>!shared.has(p))){shared=new Set(savedShared);renderShared();} updateExclusionSummary();updateSharedSummary(); ['mode','name','library','output','audio_root','listen','advertise','public_endpoint','interval'].forEach(k=>{const el=$(k.replace('_','-'));if(el&&c[k]!==undefined&&c[k]!=='')el.value=c[k]}); $('allow-audio').checked=c.allow_audio; $('invite-note').textContent=c.invite_configured?'A saved invite is configured. Leave this field blank to keep it.':''; visibleMode(); }
     async function refresh(){ try { const s=await api('/api/state'); configured=s.service.configured; currentMode=s.config?.mode||''; $('version').textContent='v'+s.version; $('mode-pill').textContent=currentMode||'Not configured'; $('service-state').textContent=s.service.running?'Running':(s.service.configured?'Stopped':'Not configured'); $('service-message').textContent=s.service.running?'Sync checks continue automatically in the background.':(s.service.configured?'Your settings are saved; start the agent to resume synchronization.':'Complete setup below to install the per-user background agent.'); $('service-dot').className='dot '+(s.service.running?'running':''); $('header-dot').className='dot '+(s.service.running?'running':''); $('header-state').textContent=s.service.running?'Background sync active':$('service-state').textContent; $('start').disabled=!configured||s.service.running; $('stop').disabled=!configured||!s.service.running; $('restart').disabled=!configured; $('remove').disabled=!configured; $('copy-invite').classList.toggle('hidden',!configured||!['host','relay'].includes(currentMode)); const r=s.receipt; $('receipt-state').textContent=r.state; $('receipt-pill').textContent=r.state; $('receipt-message').textContent=r.message||''; $('receipt-dot').className='dot '+(r.state==='READY'?'ready':(r.state==='WAITING'?'':'attention')); $('tracks').textContent=r.tracks||'—'; $('playlists').textContent=r.playlists||'—'; $('audio').textContent=r.audio_total ? r.audio_ready+'/'+r.audio_total : (r.state==='READY'?'0/0':'—'); if(s.config&&!formDirty&&!document.activeElement.matches('input,select')) fill(s.config); } catch(e){toast(e.message,true)} }
     async function logs(){ try{$('logs').textContent=(await api('/api/logs')).logs}catch(e){$('logs').textContent=e.message} }
     async function control(action){ if(action==='remove'&&!confirm('Remove the background service? Synced XML and audio files will remain.'))return; try{const d=await api('/api/control',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action})});toast(d.message);setTimeout(()=>{refresh();logs()},650)}catch(e){toast(e.message,true)} }
     async function copyInvite(){try{const value=(await api('/api/invite')).invite;if(navigator.clipboard&&navigator.clipboard.writeText){await navigator.clipboard.writeText(value)}else{const field=document.createElement('textarea');field.value=value;field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();document.execCommand('copy');field.remove()}toast('Private invite copied. Send it directly to your DJ partner.')}catch(e){toast(e.message,true)}}
-    $('setup-form').addEventListener('submit',async e=>{e.preventDefault();const body={exclude_playlists:$('mode').value==='relay'?[]:[...excluded],mode:$('mode').value,name:$('name').value,library:$('library').value,output:$('output').value,audio_root:$('audio-root').value,allow_audio:$('allow-audio').checked,invite:$('invite').value,listen:$('listen').value,advertise:$('advertise').value,public_endpoint:$('public-endpoint').value,interval:$('interval').value};$('save').disabled=true;try{const d=await api('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('invite').value='';formDirty=false;updateExclusionSummary();toast(d.message);setTimeout(()=>{refresh();logs()},800)}catch(err){toast(err.message,true)}finally{$('save').disabled=false}});
-    document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{try{const d=await api('/api/pick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:b.dataset.pick})});$(b.dataset.target).value=d.path;formDirty=true;if(b.dataset.target==='library'){playlistChoices=[];renderExclusions()}}catch(e){if(!e.message.includes('cancelled'))toast(e.message,true)}}));
+    $('setup-form').addEventListener('submit',async e=>{e.preventDefault();const body={exclude_playlists:$('mode').value==='relay'?[]:[...excluded],shared_playlists:$('mode').value==='relay'?[]:[...shared],mode:$('mode').value,name:$('name').value,library:$('library').value,output:$('output').value,audio_root:$('audio-root').value,allow_audio:$('allow-audio').checked,invite:$('invite').value,listen:$('listen').value,advertise:$('advertise').value,public_endpoint:$('public-endpoint').value,interval:$('interval').value};$('save').disabled=true;try{const d=await api('/api/setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('invite').value='';formDirty=false;updateExclusionSummary();updateSharedSummary();toast(d.message);setTimeout(()=>{refresh();logs()},800)}catch(err){toast(err.message,true)}finally{$('save').disabled=false}});
+    document.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',async()=>{try{const d=await api('/api/pick',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:b.dataset.pick})});$(b.dataset.target).value=d.path;formDirty=true;if(b.dataset.target==='library'){playlistChoices=[];renderExclusions();renderShared()}}catch(e){if(!e.message.includes('cancelled'))toast(e.message,true)}}));
     function exclusionLabel(path){ return path.slice(1).split('/').map(p=>p.replace(/~1/g,'/').replace(/~0/g,'~')).join(' › '); }
     function renderExclusions(){
       const list=$('exclusion-list'); list.replaceChildren();
@@ -152,21 +160,38 @@
       for(const item of choices.values()){
         const row=document.createElement('div');row.className='check';
         const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.id='exclude-'+index++;checkbox.checked=excluded.has(item.path);
-        checkbox.addEventListener('change',()=>{formDirty=true;if(checkbox.checked)excluded.add(item.path);else excluded.delete(item.path);updateExclusionSummary()});
+        checkbox.addEventListener('change',()=>{formDirty=true;if(checkbox.checked){excluded.add(item.path);shared.delete(item.path);renderShared()}else excluded.delete(item.path);updateExclusionSummary()});
         const label=document.createElement('label');label.htmlFor=checkbox.id;label.textContent=item.label+(item.saved?' (saved selection)':'');
         row.append(checkbox,label);list.append(row);
       }
       updateExclusionSummary();
     }
     function updateExclusionSummary(){ $('exclusion-summary').textContent=excluded.size?excluded.size+' folder/playlist selection(s) excluded from outgoing sync.'+(formDirty?' Save to apply.':' Saved.'):'No exclusions. Everything is shared.'; }
-    $('load-playlists').onclick=async()=>{
-      const button=$('load-playlists');button.disabled=true;
-      try{const data=await api('/api/playlists',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({library:$('library').value})});playlistChoices=data.playlists;renderExclusions();if(!playlistChoices.length)toast('No playlists in this export. Export your library from rekordbox first.')}
+    function renderShared(){
+      const list=$('shared-list'); list.replaceChildren();
+      const choices=new Map(playlistChoices.map(p=>[p.path,p]));
+      for(const path of shared) if(!choices.has(path)) choices.set(path,{path,label:exclusionLabel(path),saved:true});
+      let index=0;
+      for(const item of choices.values()){
+        const row=document.createElement('div');row.className='check';
+        const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.id='shared-'+index++;checkbox.checked=shared.has(item.path);
+        checkbox.addEventListener('change',()=>{formDirty=true;if(checkbox.checked){shared.add(item.path);excluded.delete(item.path);renderExclusions()}else shared.delete(item.path);updateSharedSummary()});
+        const label=document.createElement('label');label.htmlFor=checkbox.id;label.textContent=item.label+(item.saved?' (saved selection)':'');
+        row.append(checkbox,label);list.append(row);
+      }
+      updateSharedSummary();
+    }
+    function updateSharedSummary(){ $('shared-summary').textContent=shared.size?shared.size+' local contribution selection(s) feed the Duo Library.'+(formDirty?' Save to apply.':' Saved.'):'No contribution playlist selected.'; }
+    async function loadPlaylistChoices(button){
+      button.disabled=true;
+      try{const data=await api('/api/playlists',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({library:$('library').value})});playlistChoices=data.playlists;renderExclusions();renderShared();if(!playlistChoices.length)toast('No playlists in this export. Export your library from rekordbox first.')}
       catch(e){toast(e.message,true)}finally{button.disabled=false}
-    };
+    }
+    $('load-playlists').onclick=()=>loadPlaylistChoices($('load-playlists'));
+    $('load-shared-playlists').onclick=()=>loadPlaylistChoices($('load-shared-playlists'));
     $('setup-form').addEventListener('input',()=>formDirty=true);
     $('setup-form').addEventListener('change',()=>formDirty=true);
-    $('library').addEventListener('change',()=>{playlistChoices=[];renderExclusions()});
+    $('library').addEventListener('change',()=>{playlistChoices=[];renderExclusions();renderShared()});
     $('mode').addEventListener('change',visibleMode);$('allow-audio').addEventListener('change',updateAudio);$('start').onclick=()=>control('start');$('stop').onclick=()=>control('stop');$('restart').onclick=()=>control('restart');$('copy-invite').onclick=copyInvite;$('remove').onclick=()=>control('remove');$('refresh').onclick=refresh;$('refresh-logs').onclick=logs;
     visibleMode();refresh();logs();setInterval(refresh,5000);setInterval(logs,12000);
   </script>

@@ -34,6 +34,7 @@ const (
 
 type HostConfig struct {
 	ExcludePlaylists []string
+	SharedPlaylists  []string
 	LibraryPath      string
 	Name             string
 	OutputPath       string
@@ -100,7 +101,7 @@ func RunHost(ctx context.Context, cfg HostConfig) error {
 			return err
 		}
 	}
-	if err := publishFile(r, hostID, cfg.Name, cfg.LibraryPath, audioManager, cfg.ExcludePlaylists...); err != nil {
+	if err := publishFile(r, hostID, cfg.Name, cfg.LibraryPath, audioManager, cfg.ExcludePlaylists, cfg.SharedPlaylists); err != nil {
 		return fmt.Errorf("initial library: %w", err)
 	}
 	certPath, keyPath, fingerprint, err := ensureCertificate(cfg.StateDir)
@@ -150,7 +151,7 @@ func RunHost(ctx context.Context, cfg HostConfig) error {
 		errCh <- httpServer.ListenAndServeTLS(certPath, keyPath)
 	}()
 	go func() {
-		errCh <- watchAndPublish(ctx, r, hostID, cfg.Name, cfg.LibraryPath, cfg.Interval, audioManager, cfg.ExcludePlaylists...)
+		errCh <- watchAndPublish(ctx, r, hostID, cfg.Name, cfg.LibraryPath, cfg.Interval, audioManager, cfg.ExcludePlaylists, cfg.SharedPlaylists)
 	}()
 	go func() { errCh <- writeCombinedLoop(ctx, r, hostID, cfg.OutputPath, cfg.Interval, audioManager) }()
 
@@ -591,7 +592,7 @@ func (s *apiServer) upload(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *apiServer) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]any{"ok": s.ready.Load(), "version": s.version})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": s.ready.Load(), "version": s.version, "shared_playlists": true})
 }
 
 var dashboardTemplate = template.Must(template.New("dashboard").Parse(`<!doctype html>

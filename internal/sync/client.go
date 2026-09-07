@@ -23,6 +23,7 @@ import (
 
 type JoinConfig struct {
 	ExcludePlaylists []string
+	SharedPlaylists  []string
 	Invite           string
 	LibraryPath      string
 	Name             string
@@ -45,6 +46,7 @@ type clientState struct {
 
 type syncClient struct {
 	excludePlaylists []string
+	sharedPlaylists  []string
 	http             *http.Client
 	state            clientState
 	statePath        string
@@ -111,8 +113,13 @@ func RunJoin(ctx context.Context, cfg JoinConfig) error {
 			return err
 		}
 	}
-	c := &syncClient{http: httpClient, state: state, statePath: statePath, library: cfg.LibraryPath, output: cfg.OutputPath, audio: audioManager, excludePlaylists: cfg.ExcludePlaylists}
+	c := &syncClient{http: httpClient, state: state, statePath: statePath, library: cfg.LibraryPath, output: cfg.OutputPath, audio: audioManager, excludePlaylists: cfg.ExcludePlaylists, sharedPlaylists: cfg.SharedPlaylists}
 	log.Printf("paired with room %s; writing merged library to %s", state.RoomID, cfg.OutputPath)
+	if len(cfg.SharedPlaylists) > 0 {
+		if err := c.requireSharedPlaylistSupport(ctx); err != nil {
+			return err
+		}
+	}
 	if err := c.pushIfChanged(ctx, true); err != nil {
 		return err
 	}
@@ -134,6 +141,28 @@ func RunJoin(ctx context.Context, cfg JoinConfig) error {
 			}
 		}
 	}
+}
+
+func (c *syncClient) requireSharedPlaylistSupport(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.state.Endpoint+"/healthz", nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("check shared-library support: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("the host or relay could not confirm shared-library support")
+	}
+	var health struct {
+		SharedPlaylists bool `json:"shared_playlists"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&health); err != nil || !health.SharedPlaylists {
+		return errors.New("shared Duo Library requires an updated v0.5.0 host or relay")
+	}
+	return nil
 }
 
 func loadClientState(path string) (clientState, error) {
@@ -217,7 +246,7 @@ func (c *syncClient) pushIfChanged(ctx context.Context, force bool) error {
 	if !force && sum == c.lastSource {
 		return nil
 	}
-	b, err = preparePublishedSnapshot(b, c.excludePlaylists...)
+	b, err = preparePublishedSnapshot(b, c.excludePlaylists, c.sharedPlaylists)
 	if err != nil {
 		return err
 	}
@@ -708,7 +737,7 @@ func responseError(resp *http.Response) error {
 	return fmt.Errorf("host returned %s", resp.Status)
 }
 
-func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager, exclusions ...string) error {
+func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager, exclusions, shared []string) error {
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -716,7 +745,7 @@ func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager
 	if len(b) > maxXMLBytes {
 		return errors.New("library XML exceeds the 128 MiB safety limit")
 	}
-	b, err = preparePublishedSnapshot(b, exclusions...)
+	b, err = preparePublishedSnapshot(b, exclusions, shared)
 	if err != nil {
 		return err
 	}
@@ -731,7 +760,7 @@ func publishFile(r *room, peerID, name, path string, audioManager *audio.Manager
 	return r.update(peerID, name, b)
 }
 
-func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, interval time.Duration, audioManager *audio.Manager, exclusions ...string) error {
+func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, interval time.Duration, audioManager *audio.Manager, exclusions, shared []string) error {
 	initial, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -753,7 +782,7 @@ func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, in
 			if sum == last {
 				continue
 			}
-			b, err = preparePublishedSnapshot(b, exclusions...)
+			b, err = preparePublishedSnapshot(b, exclusions, shared)
 			if err != nil {
 				log.Printf("ignored invalid XML update: %v", err)
 				continue
@@ -777,8 +806,12 @@ func watchAndPublish(ctx context.Context, r *room, peerID, name, path string, in
 	}
 }
 
-func preparePublishedSnapshot(data []byte, exclusions ...string) ([]byte, error) {
+func preparePublishedSnapshot(data []byte, exclusions, shared []string) ([]byte, error) {
 	data, err := library.ExcludePlaylistsXML(data, exclusions)
+	if err != nil {
+		return nil, err
+	}
+	data, err = library.PrepareSharedPlaylistsXML(data, shared)
 	if err != nil {
 		return nil, err
 	}

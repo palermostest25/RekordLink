@@ -67,6 +67,41 @@ func TestExclusionsPersistThroughServiceConfig(t *testing.T) {
 	}
 }
 
+func TestSharedPlaylistsPersistThroughServiceConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "source.xml")
+	data, err := library.Marshal(&library.Library{Playlists: library.Playlists{Root: library.Node{Type: "0", Name: "ROOT", Nodes: []library.Node{
+		{Type: "1", Name: "My Duo Contributions"}, {Type: "1", Name: "Private"},
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"host", "join"} {
+		request := setupRequest{Mode: mode, Name: "DJ", Library: path, ExcludePlaylists: []string{"/Private"}, SharedPlaylists: []string{"/My Duo Contributions"}}
+		command, args, err := buildServiceArgs(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		view := viewConfig(service.Config{Command: command, Args: args})
+		if !reflect.DeepEqual(view.SharedPlaylists, request.SharedPlaylists) {
+			t.Fatalf("saved shared playlists lost: %v", view.SharedPlaylists)
+		}
+		request.SharedPlaylists = []string{"/Missing"}
+		if _, _, err := buildServiceArgs(request); err == nil {
+			t.Fatal("saved a missing shared contribution")
+		}
+		request.SharedPlaylists = []string{"/Private"}
+		if _, _, err := buildServiceArgs(request); err == nil {
+			t.Fatal("same playlist was accepted as excluded and shared")
+		}
+	}
+	if got := options([]string{"--shared-playlist=/One", "--shared-playlist", "/Two"}, "--shared-playlist"); !reflect.DeepEqual(got, []string{"/One", "/Two"}) {
+		t.Fatalf("CLI equals form lost: %v", got)
+	}
+}
+
 func TestPlaylistPickerListsExactPathsAndRequiresCSRF(t *testing.T) {
 	path, err := filepath.Abs(filepath.Join("..", "library", "testdata", "dj-a.xml"))
 	if err != nil {
