@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Replaced the wide macOS menu-bar text label with a standard square sync icon and a compact `RL` fallback.
+- Added a free shared-playlist workflow: each DJ selects their own editable contribution playlist or folder, and RekordLink publishes one de-duplicated `Duo Library` containing both contributions.
+- Kept contribution sources out of the generated per-DJ trees so the imported XML contains one combined playlist rather than duplicate contribution copies.
+- Made shared contributions fail closed when a configured source path disappears or points inside generated RekordLink output.
+- Persisted repeatable `--shared-playlist` selections in the dashboard and background service configuration. Updated merge hosts/relays consume the internal contribution marker without changing the HTTP protocol.
 - Added a dashboard folder/playlist picker for sharing everything except selected paths, plus repeatable `--exclude-playlist` flags for hosts and joining clients.
 - Applied exclusions before audio preparation and publication, including metadata-only mode. Descendant playlists, their collection tracks, same-location duplicate records, and references from other playlists are withheld; unfiled tracks remain shared.
 - Persisted exclusions in background-service settings and blocked publication when a selected path disappears, preventing renamed folders from silently becoming shared.

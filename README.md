@@ -4,10 +4,11 @@ RekordLink keeps two DJs' rekordbox libraries and authorized local audio synchro
 
 > RekordLink is independent software. It is not affiliated with, endorsed by, or supported by AlphaTheta Corporation or Pioneer DJ.
 
-## What v0.4.5 does
+## What v0.5.0 does
 
 - Watches rekordbox XML Auto Export output in the background.
 - Merges both complete playlist trees under `RekordLink / <DJ name>`.
+- Combines selected editable playlists from both DJs into one generated `RekordLink / Duo Library` playlist without a paid rekordbox collaboration plan.
 - Treats the generated top-level `RekordLink` folder as replace-only derived output, preventing an imported shared tree from being published back and nested again.
 - Copies referenced local audio into a managed library using SHA-256 content identity.
 - Uploads audio before publishing its track metadata.
@@ -32,6 +33,40 @@ rekordlink ui
 ```
 
 The dashboard provides the complete first-run setup, native file/folder selection where the operating system supports it, service controls, private invite copying for hosts/relays, recent logs, and the current `READY`/`INCOMPLETE` library receipt. It listens only on the local loopback interface; it is not a remote administration console.
+
+## Build one shared Duo Library for free
+
+Each DJ creates a normal editable playlist in their own rekordbox library, for
+example **Duo Contributions - Sam** and **Duo Contributions - Jay**. In the
+RekordLink dashboard, each person chooses **Build one shared Duo Library →
+Choose my contribution playlist**, selects their own playlist, and saves the
+background configuration.
+
+After rekordbox closes and updates Auto Export, RekordLink combines both
+contribution lists into one de-duplicated playlist at **RekordLink / Duo
+Library**. On the next rekordbox launch, refresh the Bridge XML, remove the
+previous imported `RekordLink` folder, and import the fresh top-level folder.
+The original contribution playlists remain local and editable; the imported
+`Duo Library` is generated output and should be treated as read-only.
+
+Both DJs can add tracks independently and simultaneous additions are retained.
+Removing a track from your contribution withdraws your contribution of that
+track; it remains in `Duo Library` while the other DJ still contributes it.
+Playlist order is deterministic but is not collaboratively edited. Track cues
+and beatgrids continue to use the requesting DJ's local version when available.
+
+Folders may be selected and are flattened into the single `Duo Library` track
+list. Multiple selections are also supported. Paths are exact and fail closed
+if renamed, preventing a stale setting from silently changing meaning. The CLI
+equivalent is repeatable:
+
+```text
+--shared-playlist '/Duo Contributions - Sam'
+```
+
+The merge host or relay must run v0.5.0 for the shared union, and both clients
+must run v0.5.0 to contribute. The transport remains compatible with older
+clients, which simply do not contribute a shared playlist.
 
 ## Share everything except selected folders or playlists
 
@@ -267,8 +302,8 @@ Go 1.24 or newer is required.
 ```bash
 make test
 make vet
-make package VERSION=0.4.5
-make docker-build VERSION=0.4.5
+make package VERSION=0.5.0
+make docker-build VERSION=0.5.0
 ```
 
 Release archives and checksums are written to `dist/` for macOS Apple Silicon and Intel, Linux x86-64, Windows x86-64, and a self-contained Docker build-context archive. When packaging on macOS, the build also produces a universal `RekordLink.app` containing both Apple Silicon and Intel executables.

@@ -219,7 +219,9 @@ func runHost(args []string) error {
 func runHostMode(args []string, showInvite bool) error {
 	fs := flag.NewFlagSet("host", flag.ContinueOnError)
 	var exclusions []string
+	var sharedPlaylists []string
 	fs.Func("exclude-playlist", "exclude a folder/playlist path and its tracks (repeatable; e.g. /Jay)", func(path string) error { exclusions = append(exclusions, path); return nil })
+	fs.Func("shared-playlist", "contribute a folder/playlist to the combined Duo Library (repeatable)", func(path string) error { sharedPlaylists = append(sharedPlaylists, path); return nil })
 	libraryPath := fs.String("library", "", "path to a rekordbox XML export")
 	name := fs.String("name", "", "DJ display name")
 	output := fs.String("output", "", "merged XML output path")
@@ -248,6 +250,7 @@ func runHostMode(args []string, showInvite bool) error {
 	defer stop()
 	return rlsync.RunHost(ctx, rlsync.HostConfig{
 		ExcludePlaylists: exclusions,
+		SharedPlaylists:  sharedPlaylists,
 		LibraryPath:      *libraryPath,
 		Name:             *name,
 		OutputPath:       *output,
@@ -264,7 +267,9 @@ func runHostMode(args []string, showInvite bool) error {
 func runJoin(args []string) error {
 	fs := flag.NewFlagSet("join", flag.ContinueOnError)
 	var exclusions []string
+	var sharedPlaylists []string
 	fs.Func("exclude-playlist", "exclude a folder/playlist path and its tracks (repeatable; e.g. /Jay)", func(path string) error { exclusions = append(exclusions, path); return nil })
+	fs.Func("shared-playlist", "contribute a folder/playlist to the combined Duo Library (repeatable)", func(path string) error { sharedPlaylists = append(sharedPlaylists, path); return nil })
 	invite := fs.String("invite", "", "rekordlink:// invite printed by the host")
 	libraryPath := fs.String("library", "", "path to a rekordbox XML export")
 	name := fs.String("name", "", "DJ display name")
@@ -292,6 +297,7 @@ func runJoin(args []string) error {
 	defer stop()
 	return rlsync.RunJoin(ctx, rlsync.JoinConfig{
 		ExcludePlaylists: exclusions,
+		SharedPlaylists:  sharedPlaylists,
 		Invite:           *invite,
 		LibraryPath:      *libraryPath,
 		Name:             *name,

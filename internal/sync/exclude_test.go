@@ -2,6 +2,7 @@ package sync
 
 import (
 	"bytes"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -136,7 +137,7 @@ func TestHostExcludesBeforeAudioPreparation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := publishFile(r, r.hostID(), "Host", source, manager, "/Jay"); err != nil {
+	if err := publishFile(r, r.hostID(), "Host", source, manager, []string{"/Jay"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := manager.HasBlob(privateHash); ok {
@@ -157,11 +158,81 @@ func TestHostExcludesBeforeAudioPreparation(t *testing.T) {
 func TestExclusionsCanTargetGeneratedTreesBeforeStripping(t *testing.T) {
 	_, data, _, _ := excludedSource(t)
 	data = bytes.ReplaceAll(data, []byte(`Name="Jay"`), []byte(`Name="RekordLink"`))
-	clean, err := preparePublishedSnapshot(data, "/RekordLink/Set")
+	clean, err := preparePublishedSnapshot(data, []string{"/RekordLink/Set"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if bytes.Contains(clean, []byte("PRIVATE TITLE")) {
 		t.Fatal("managed-root stripping bypassed track exclusion")
+	}
+}
+
+func TestSharedContributionPublishesAsDuoLibrary(t *testing.T) {
+	source, original, _, _ := excludedSource(t)
+	roomState, err := newRelayRoom(filepath.Join(t.TempDir(), "room.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, token, err := roomState.register("Sam", roomState.inviteCode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &apiServer{room: roomState, registerFails: map[string][]time.Time{}}
+	httpServer := httptest.NewServer(server.handler())
+	defer httpServer.Close()
+	client := &syncClient{
+		http:            httpServer.Client(),
+		state:           clientState{Endpoint: httpServer.URL, PeerID: id, Token: token, Name: "Sam"},
+		library:         source,
+		sharedPlaylists: []string{"/Mine"},
+	}
+	if err := client.pushIfChanged(t.Context(), true); err != nil {
+		t.Fatal(err)
+	}
+	data, _, err := roomState.combined(id)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib, err := library.Parse(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := lib.Playlists.Root.Nodes[0]
+	if len(root.Nodes) < 1 || root.Nodes[0].Name != library.SharedPlaylistName || len(root.Nodes[0].Tracks) != 2 {
+		t.Fatalf("generated Duo Library is wrong: %+v", root.Nodes)
+	}
+	if bytes.Contains(data, []byte(library.SharedContributionRootName)) {
+		t.Fatal("internal contribution marker leaked into merged XML")
+	}
+	actual, err := os.ReadFile(source)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(actual, original) {
+		t.Fatal("source library changed")
+	}
+}
+
+func TestSharedContributionRequiresUpdatedMergeServer(t *testing.T) {
+	for _, supported := range []bool{false, true} {
+		t.Run(map[bool]string{false: "old", true: "updated"}[supported], func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if supported {
+					_, _ = w.Write([]byte(`{"ok":true,"shared_playlists":true}`))
+				} else {
+					_, _ = w.Write([]byte(`{"ok":true,"version":"0.4.5"}`))
+				}
+			}))
+			defer server.Close()
+			client := &syncClient{http: server.Client(), state: clientState{Endpoint: server.URL}}
+			err := client.requireSharedPlaylistSupport(t.Context())
+			if supported && err != nil {
+				t.Fatalf("updated server rejected: %v", err)
+			}
+			if !supported && err == nil {
+				t.Fatal("old merge server accepted shared contribution")
+			}
+		})
 	}
 }

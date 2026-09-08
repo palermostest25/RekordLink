@@ -70,6 +70,9 @@ func Merge(snapshots []Snapshot, requesterID string) (*Library, error) {
 	}
 
 	rekordLinkFolder := Node{Type: "0", Name: ManagedPlaylistRootName}
+	sharedTracks := []PlaylistTrack{}
+	sharedSeen := map[string]bool{}
+	hasSharedContributions := false
 	for _, snapshot := range snapshots {
 		if snapshot.Library == nil {
 			continue
@@ -79,10 +82,25 @@ func Merge(snapshots []Snapshot, requesterID string) (*Library, error) {
 		// older relay. Generated RekordLink trees are derived output, never new
 		// source material.
 		children, _ := originalPlaylistRoots(snapshot.Library.Playlists.Root.Nodes)
+		children, contributions := splitSharedContributionRoots(children)
+		hasSharedContributions = hasSharedContributions || len(contributions) > 0
 		for _, child := range children {
 			peerFolder.Nodes = append(peerFolder.Nodes, remapNode(child, snapshot.PeerID, identityByPeerTrack, mergedID))
 		}
 		rekordLinkFolder.Nodes = append(rekordLinkFolder.Nodes, peerFolder)
+		for _, contribution := range contributions {
+			collectPlaylistRefs(contribution, func(ref PlaylistTrack) {
+				identity := identityByPeerTrack[snapshot.PeerID+"\x00"+ref.Key]
+				id := mergedID[identity]
+				if id != "" && !sharedSeen[id] {
+					sharedSeen[id] = true
+					sharedTracks = append(sharedTracks, PlaylistTrack{Key: id})
+				}
+			})
+		}
+	}
+	if hasSharedContributions {
+		rekordLinkFolder.Nodes = append([]Node{{Type: "1", Name: SharedPlaylistName, KeyType: "0", Tracks: sharedTracks}}, rekordLinkFolder.Nodes...)
 	}
 	merged.Playlists.Root.Nodes = []Node{rekordLinkFolder}
 	return merged, nil

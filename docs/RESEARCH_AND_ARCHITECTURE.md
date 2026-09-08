@@ -160,13 +160,14 @@ The merged root is:
 ```text
 ROOT
 └── RekordLink
+    ├── Duo Library
     ├── DJ A
     │   └── <DJ A's original folders/playlists>
     └── DJ B
         └── <DJ B's original folders/playlists>
 ```
 
-Source XML files are read-only. RekordLink never removes or rewrites their tracks or playlists. Namespace separation avoids same-level duplicate playlist names, which AlphaTheta's developer documentation says are not permitted.
+Source XML files are read-only. RekordLink never rewrites them on disk. Namespace separation avoids same-level duplicate playlist names, which AlphaTheta's developer documentation says are not permitted. A client may select local contribution paths; those nodes move into an internal marker in the published copy and are consumed into `Duo Library` by the merge engine.
 
 `RekordLink` is a reserved top-level playlist namespace. Before publication, the client parses a copy of the Auto Export XML and excludes folders named `RekordLink` or a rekordbox-style numeric copy such as `RekordLink (2)`. The source file itself is never changed. The merge engine repeats this exclusion for defense in depth and for snapshots retained from earlier clients. Collection tracks are not excluded: their audio content identity and requester-local record precedence already provide the correct de-duplication behavior.
 
@@ -199,11 +200,13 @@ A production UI should show alternate versions and let the user choose:
 
 Beatgrids should be treated as atomic versioned sequences, not merged marker-by-marker. Cue slots require stable identities and explicit collision handling.
 
-### 5.4 Ordered playlists
+### 5.4 Shared and ordered playlists
 
-v0.3 does not co-edit one logical ordered playlist; it preserves both source lists. rekordbox Collaborative Playlist should be used for live co-editing. A future independent editor should use an ordered sequence CRDT such as LSEQ/RGA or a server-serialized operation log with stable entry IDs. Plain last-writer-wins on the whole ordered list is unacceptable because simultaneous insertions cause lost work.
+v0.5 adds an add/remove-safe shared-library workflow without pretending XML snapshots are a live multi-writer database. Each DJ selects an independently editable local contribution playlist or folder. The publication copy moves those nodes into a reserved transport marker, and an updated merge host/relay consumes all markers into one de-duplicated `Duo Library` playlist. The marker and individual contribution lists are never emitted in the generated playlist tree. A track remains in the union while at least one DJ contributes it, which prevents one participant from erasing the other's contribution by omission.
 
-## 6. Shipped v0.4.5 architecture
+The shared union has deterministic order but does not attempt collaborative reordering. A future independent ordered editor should use an ordered sequence CRDT such as LSEQ/RGA or a server-serialized operation log with stable entry IDs. Plain last-writer-wins on the whole ordered list is unacceptable because simultaneous insertions cause lost work. rekordbox Collaborative Playlist remains the option for live co-editing while rekordbox is open.
+
+## 6. Shipped v0.5.0 architecture
 
 ```text
 DJ A laptop (host)                              DJ B laptop (guest)
@@ -448,6 +451,7 @@ Add OneLibrary only when AlphaTheta publishes or licenses a stable writer specif
 - no-client-VPN public HTTPS relay mode and Cloudflare Tunnel Compose deployment;
 - resumable chunked XML/audio transfer;
 - namespaced shared output;
+- one de-duplicated shared contribution playlist;
 - deterministic packaging and checksums.
 
 ### Phase 1 — usability release
@@ -465,7 +469,7 @@ Add OneLibrary only when AlphaTheta publishes or licenses a stable writer specif
 - SQLite operation journal;
 - versioned cue/grid sets and manual resolution;
 - ordered collaborative playlists;
-- privacy scopes for personal versus duo playlists;
+- richer privacy scopes for personal versus duo playlists;
 - offline edits and deterministic reconciliation;
 - relay storage quotas and cleanup policy.
 

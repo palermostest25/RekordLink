@@ -38,6 +38,7 @@ type Options struct {
 
 type setupRequest struct {
 	ExcludePlaylists []string `json:"exclude_playlists"`
+	SharedPlaylists  []string `json:"shared_playlists"`
 	Mode             string   `json:"mode"`
 	Name             string   `json:"name"`
 	Library          string   `json:"library"`
@@ -53,6 +54,7 @@ type setupRequest struct {
 
 type configView struct {
 	ExcludePlaylists []string `json:"exclude_playlists"`
+	SharedPlaylists  []string `json:"shared_playlists"`
 	Mode             string   `json:"mode"`
 	Name             string   `json:"name,omitempty"`
 	Library          string   `json:"library,omitempty"`
@@ -423,7 +425,11 @@ func buildServiceArgs(request setupRequest) (string, []string, error) {
 	if _, err := library.Parse(data); err != nil {
 		return "", nil, fmt.Errorf("validate library XML: %w", err)
 	}
-	if _, err := library.ExcludePlaylistsXML(data, request.ExcludePlaylists); err != nil {
+	filtered, err := library.ExcludePlaylistsXML(data, request.ExcludePlaylists)
+	if err != nil {
+		return "", nil, err
+	}
+	if _, err := library.PrepareSharedPlaylistsXML(filtered, request.SharedPlaylists); err != nil {
 		return "", nil, err
 	}
 	output := strings.TrimSpace(request.Output)
@@ -440,6 +446,9 @@ func buildServiceArgs(request setupRequest) (string, []string, error) {
 	args := []string{"--name", name, "--library", libraryPath, "--output", output}
 	for _, path := range request.ExcludePlaylists {
 		args = append(args, "--exclude-playlist", path)
+	}
+	for _, path := range request.SharedPlaylists {
+		args = append(args, "--shared-playlist", path)
 	}
 	if request.AllowAudio {
 		audioRoot, err := absolutePath(request.AudioRoot)
@@ -486,6 +495,7 @@ func absolutePath(value string) (string, error) {
 func viewConfig(cfg service.Config) configView {
 	view := configView{
 		ExcludePlaylists: options(cfg.Args, "--exclude-playlist"),
+		SharedPlaylists:  options(cfg.Args, "--shared-playlist"),
 		Mode:             cfg.Command,
 		Name:             option(cfg.Args, "--name"),
 		Library:          option(cfg.Args, "--library"),
