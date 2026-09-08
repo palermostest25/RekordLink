@@ -20,16 +20,17 @@
     (void)notification;
     [NSApp setActivationPolicy:NSApplicationActivationPolicyAccessory];
 
-    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSVariableStatusItemLength];
+    self.statusItem = [[NSStatusBar systemStatusBar] statusItemWithLength:NSSquareStatusItemLength];
     NSStatusBarButton *button = self.statusItem.button;
-    NSImage *image = [NSImage imageWithSystemSymbolName:@"point.3.connected.trianglepath.dotted"
+    NSImage *image = [NSImage imageWithSystemSymbolName:@"arrow.triangle.2.circlepath"
                               accessibilityDescription:@"RekordLink"];
     if (image != nil) {
         image.template = YES;
         button.image = image;
-        button.title = @" RekordLink";
+        button.imagePosition = NSImageOnly;
+        button.title = @"";
     } else {
-        button.title = @"RL RekordLink";
+        button.title = @"RL";
     }
     button.toolTip = @"RekordLink duo library sync";
 

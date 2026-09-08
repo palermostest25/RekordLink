@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Replaced the wide macOS menu-bar text label with a standard square sync icon and a compact `RL` fallback.
 - Added a free shared-playlist workflow: each DJ selects their own editable contribution playlist or folder, and RekordLink publishes one de-duplicated `Duo Library` containing both contributions.
 - Kept contribution sources out of the generated per-DJ trees so the imported XML contains one combined playlist rather than duplicate contribution copies.
 - Made shared contributions fail closed when a configured source path disappears or points inside generated RekordLink output.
