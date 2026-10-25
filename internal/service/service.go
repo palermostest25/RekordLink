@@ -52,7 +52,17 @@ func Install(command string, args []string) (Paths, error) {
 		return Paths{}, err
 	}
 	executable := paths.Executable
-	if filepath.Clean(sourceExecutable) != filepath.Clean(executable) {
+	launchExecutable := executable
+	if runtime.GOOS == "darwin" {
+		if appExecutable := bundledAppExecutable(sourceExecutable); appExecutable != "" {
+			// Keep the LaunchAgent attached to the signed application. macOS uses
+			// the responsible application when deciding Files & Folders access;
+			// launching an unrelated copied CLI causes repeated removable-volume
+			// prompts even when RekordLink.app itself has been approved.
+			launchExecutable = appExecutable
+		}
+	}
+	if launchExecutable == executable && filepath.Clean(sourceExecutable) != filepath.Clean(executable) {
 		binary, err := os.ReadFile(sourceExecutable)
 		if err != nil {
 			return Paths{}, fmt.Errorf("stage background executable: %w", err)
@@ -86,7 +96,7 @@ func Install(command string, args []string) (Paths, error) {
 	}
 	switch runtime.GOOS {
 	case "darwin":
-		if err := writeAtomic(paths.Unit, []byte(renderLaunchAgent(executable, paths.Config, paths.Log)), 0o600); err != nil {
+		if err := writeAtomic(paths.Unit, []byte(renderLaunchAgent(launchExecutable, paths.Config, paths.Log)), 0o600); err != nil {
 			return Paths{}, err
 		}
 		uid, err := currentUID()
@@ -126,6 +136,25 @@ func Install(command string, args []string) (Paths, error) {
 		return Paths{}, fmt.Errorf("background service installation is unsupported on %s", runtime.GOOS)
 	}
 	return paths, nil
+}
+
+func bundledAppExecutable(enginePath string) string {
+	clean := filepath.Clean(enginePath)
+	marker := string(filepath.Separator) + "Contents" + string(filepath.Separator) + "Resources" + string(filepath.Separator)
+	index := strings.LastIndex(clean, marker)
+	if index < 0 || filepath.Base(clean) != "rekordlink" {
+		return ""
+	}
+	appRoot := clean[:index]
+	if !strings.HasSuffix(strings.ToLower(appRoot), ".app") {
+		return ""
+	}
+	candidate := filepath.Join(appRoot, "Contents", "MacOS", "RekordLinkMenu")
+	info, err := os.Stat(candidate)
+	if err != nil || info.IsDir() || info.Mode()&0o111 == 0 {
+		return ""
+	}
+	return candidate
 }
 
 func Uninstall() (Paths, error) {
@@ -365,7 +394,7 @@ func renderLaunchAgent(executable, config, logPath string) string {
 <plist version="1.0"><dict>
 <key>Label</key><string>` + xmlEscape(label) + `</string>
 <key>ProgramArguments</key><array><string>` + xmlEscape(executable) + `</string><string>_service_run</string><string>` + xmlEscape(config) + `</string></array>
-<key>RunAtLoad</key><true/><key>KeepAlive</key><true/><key>ThrottleInterval</key><integer>10</integer>
+<key>RunAtLoad</key><true/><key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict><key>ThrottleInterval</key><integer>300</integer>
 <key>ProcessType</key><string>Background</string>
 <key>StandardOutPath</key><string>` + xmlEscape(logPath) + `</string>
 <key>StandardErrorPath</key><string>` + xmlEscape(logPath) + `</string>

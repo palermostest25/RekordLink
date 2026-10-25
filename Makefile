@@ -1,4 +1,4 @@
-VERSION ?= 0.4.5
+VERSION ?= 0.6.0
 GOCACHE ?= /tmp/rekordlink-gocache
 
 .PHONY: build test vet package docker-build clean

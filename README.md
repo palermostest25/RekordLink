@@ -4,7 +4,7 @@ RekordLink keeps two DJs' rekordbox libraries and authorized local audio synchro
 
 > RekordLink is independent software. It is not affiliated with, endorsed by, or supported by AlphaTheta Corporation or Pioneer DJ.
 
-## What v0.5.0 does
+## What v0.6.0 does
 
 - Watches rekordbox XML Auto Export output in the background.
 - Merges both complete playlist trees under `RekordLink / <DJ name>`.
@@ -18,13 +18,14 @@ RekordLink keeps two DJs' rekordbox libraries and authorized local audio synchro
 - Uses certificate-pinned TLS for direct rooms and system-verified HTTPS for public relays, plus twelve-digit invite pairing, rate limits, and 256-bit bearer credentials.
 - Resumes interrupted XML and audio transfers in proxy-safe 4 MiB chunks.
 - Installs as a macOS LaunchAgent, Linux systemd user service, or Windows login task.
-- Includes a cross-platform local management dashboard and a native macOS menu-bar app.
+- Includes a native macOS setup and status window, a compact menu-bar app, and the existing cross-platform local dashboard for Windows and Linux.
+- Checks GitHub Releases for updates and verifies the release checksum and macOS app signature before installing.
 - Ships a hardened, persistent Docker deployment for the always-on relay on `linux/amd64` and `linux/arm64`.
 - Never reads or writes rekordbox's encrypted `master.db`.
 
-## Open the management UI
+## Open RekordLink
 
-On macOS, unzip the universal release and open `RekordLink.app`. It runs as a menu-bar app (without a Dock icon) and provides **Open Dashboard**, **Start**, **Stop**, and **Restart** commands. Quitting the menu-bar UI does not stop an installed background sync service.
+On macOS, unzip the universal release and open `RekordLink.app`. RekordLink installs itself in `~/Applications` when needed, opens a native setup window, and stays available from a compact menu-bar icon without adding a Dock icon. The window includes setup, playlist sharing, service status, recent activity, file access help, and automatic update checks. Quitting the menu-bar app does not stop an installed background sync service.
 
 On macOS, Windows, or Linux, the same dashboard is available from the CLI:
 
@@ -32,15 +33,14 @@ On macOS, Windows, or Linux, the same dashboard is available from the CLI:
 rekordlink ui
 ```
 
-The dashboard provides the complete first-run setup, native file/folder selection where the operating system supports it, service controls, private invite copying for hosts/relays, recent logs, and the current `READY`/`INCOMPLETE` library receipt. It listens only on the local loopback interface; it is not a remote administration console.
+The cross-platform dashboard remains available to CLI users. It listens only on the local loopback interface; it is not a remote administration console.
 
 ## Build one shared Duo Library for free
 
 Each DJ creates a normal editable playlist in their own rekordbox library, for
 example **Duo Contributions - Sam** and **Duo Contributions - Jay**. In the
-RekordLink dashboard, each person chooses **Build one shared Duo Library →
-Choose my contribution playlist**, selects their own playlist, and saves the
-background configuration.
+RekordLink app, each person marks their own editable playlist as **Duo Library**,
+then chooses **Save & Start Sync**.
 
 After rekordbox closes and updates Auto Export, RekordLink combines both
 contribution lists into one de-duplicated playlist at **RekordLink / Duo
@@ -70,9 +70,9 @@ clients, which simply do not contribute a shared playlist.
 
 ## Share everything except selected folders or playlists
 
-In the dashboard, use **Share everything except… → Choose folders / playlists**.
-The list comes from your selected rekordbox XML export. Check the folders or
-playlists to exclude, then choose **Save and run in background**. Export again
+In the native setup window, mark folders or playlists as **Private**.
+The list comes from your selected rekordbox XML export, and everything not
+marked private is shared. Choose **Save & Start Sync**. Export again
 from rekordbox first if newly created folders are not listed.
 
 For example, exclude your imported **Jay** folder and your **Private** folder.
@@ -245,15 +245,17 @@ rekordlink service status
 rekordlink service uninstall
 ```
 
-The installer copies the engine into a stable, private per-user application-data location, then uses LaunchAgents on macOS, user services on Linux, or Task Scheduler on Windows. This prevents moving or deleting an extracted release archive from breaking the service. Use absolute library/audio paths because login services do not inherit an interactive shell's working directory.
+On macOS, the app installs itself at a stable application path and the LaunchAgent starts background work through that signed app identity. Linux uses a copied engine and a systemd user service; Windows uses a copied engine and Task Scheduler. Use absolute library/audio paths because login services do not inherit an interactive shell's working directory.
 
-All bulk client audio storage follows the **Managed audio folder** selected in the dashboard. Content-addressed upload objects live below `.rekordlink/blobs`, and rekordbox-facing synchronized files live below `.rekordlink/library`. When the filesystem supports hard links, those two paths refer to the same immutable bytes and do not consume duplicate file data. Application Support contains only the executable, configuration, room credentials, receipts, and logs.
+All bulk client audio storage follows the **Managed audio folder** selected in the app. Content-addressed upload objects live below `.rekordlink/blobs`, and rekordbox-facing synchronized files live below `.rekordlink/library`. When the filesystem supports hard links, those two paths refer to the same immutable bytes and do not consume duplicate file data. Application Support contains only configuration, room credentials, receipts, and logs.
 
 On the first v0.4.3-or-newer start, RekordLink verifies every completed object in the legacy Application Support blob cache, moves it to the managed audio folder, and removes the legacy cache only after migration succeeds. Partial transfers may restart from the authoritative peer when the folders are on different disks.
 
-### macOS reports `operation not permitted` for audio
+### macOS asks to access a removable volume
 
-macOS privacy controls can deny a background LaunchAgent access to protected locations such as `~/Library/Messages/Attachments`, even when the signed-in user owns the file. Prefer moving the audio into a normal managed music folder and using rekordbox's **Relocate** command so its XML points to the durable copy. If the protected location must remain, grant **Full Disk Access** to the installed engine at `~/Library/Application Support/RekordLink/bin/rekordlink`, then restart RekordLink from the dashboard.
+Choose the rekordbox XML and managed audio folder with the **Choose…** buttons in the native app. macOS treats a selection in its Open or Save panel as explicit approval for that file or removable-volume location. The background agent runs through the same `RekordLink.app` identity, so permission belongs to the app shown in System Settings instead of an invisible copied command-line engine.
+
+If access was previously denied, open **RekordLink → Updates → Open Privacy Settings**, enable RekordLink, and choose **Restart** from the menu-bar icon. A denied volume is temporarily cooled down so macOS is not asked again every few seconds. For protected locations outside removable volumes, grant Full Disk Access to `~/Applications/RekordLink.app` (or `/Applications/RekordLink.app` if installed there).
 
 RekordLink treats an unreadable source as a per-track warning: the track's metadata continues to synchronize and the rest of the library is not interrupted, but that track cannot be copied or reported audio-ready until the source becomes readable.
 
@@ -302,8 +304,8 @@ Go 1.24 or newer is required.
 ```bash
 make test
 make vet
-make package VERSION=0.5.0
-make docker-build VERSION=0.5.0
+make package VERSION=0.6.0
+make docker-build VERSION=0.6.0
 ```
 
 Release archives and checksums are written to `dist/` for macOS Apple Silicon and Intel, Linux x86-64, Windows x86-64, and a self-contained Docker build-context archive. When packaging on macOS, the build also produces a universal `RekordLink.app` containing both Apple Silicon and Intel executables.

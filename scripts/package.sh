@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-VERSION="${1:-0.4.5}"
+VERSION="${1:-0.6.0}"
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 DIST_DIR="$ROOT_DIR/dist"
 STAGE_DIR="$DIST_DIR/stage"
@@ -29,8 +29,8 @@ build_archive() {
     mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
     cp "$package_dir/rekordlink" "$app_dir/Contents/Resources/rekordlink"
     sed "s/@@VERSION@@/$VERSION/g" "$ROOT_DIR/macos/RekordLinkMenu/Info.plist.in" > "$app_dir/Contents/Info.plist"
-    xcrun --sdk macosx clang -fobjc-arc -framework Cocoa -mmacosx-version-min=11.0 -arch "$native_arch" \
-      -o "$app_dir/Contents/MacOS/RekordLinkMenu" "$ROOT_DIR/macos/RekordLinkMenu/main.m"
+    xcrun --sdk macosx swiftc -parse-as-library -framework SwiftUI -framework AppKit -framework CryptoKit -target "$native_arch-apple-macos11.0" \
+      -o "$app_dir/Contents/MacOS/RekordLinkMenu" "$ROOT_DIR/macos/RekordLinkMenu/RekordLinkApp.swift"
     codesign --force --deep --sign "${MACOS_SIGN_IDENTITY:--}" "$app_dir"
   fi
   cp "$ROOT_DIR/README.md" "$ROOT_DIR/LICENSE" "$ROOT_DIR/SECURITY.md" "$ROOT_DIR/CHANGELOG.md" "$package_dir/"
@@ -77,8 +77,12 @@ if [ "$(uname -s)" = "Darwin" ]; then
     "$STAGE_DIR/rekordlink_${VERSION}_darwin_amd64/rekordlink" \
     -output "$universal_app/Contents/Resources/rekordlink"
   sed "s/@@VERSION@@/$VERSION/g" "$ROOT_DIR/macos/RekordLinkMenu/Info.plist.in" > "$universal_app/Contents/Info.plist"
-  xcrun --sdk macosx clang -fobjc-arc -framework Cocoa -mmacosx-version-min=11.0 -arch arm64 -arch x86_64 \
-    -o "$universal_app/Contents/MacOS/RekordLinkMenu" "$ROOT_DIR/macos/RekordLinkMenu/main.m"
+  xcrun --sdk macosx swiftc -parse-as-library -framework SwiftUI -framework AppKit -framework CryptoKit -target arm64-apple-macos11.0 \
+    -o "$STAGE_DIR/RekordLinkMenu-arm64" "$ROOT_DIR/macos/RekordLinkMenu/RekordLinkApp.swift"
+  xcrun --sdk macosx swiftc -parse-as-library -framework SwiftUI -framework AppKit -framework CryptoKit -target x86_64-apple-macos11.0 \
+    -o "$STAGE_DIR/RekordLinkMenu-x86_64" "$ROOT_DIR/macos/RekordLinkMenu/RekordLinkApp.swift"
+  lipo -create "$STAGE_DIR/RekordLinkMenu-arm64" "$STAGE_DIR/RekordLinkMenu-x86_64" \
+    -output "$universal_app/Contents/MacOS/RekordLinkMenu"
   codesign --force --deep --sign "${MACOS_SIGN_IDENTITY:--}" "$universal_app"
   cp "$ROOT_DIR/README.md" "$ROOT_DIR/LICENSE" "$ROOT_DIR/SECURITY.md" "$ROOT_DIR/CHANGELOG.md" "$universal_dir/"
   mkdir -p "$universal_dir/docs"

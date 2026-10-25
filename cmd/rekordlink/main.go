@@ -45,6 +45,8 @@ func run() error {
 		return runService(os.Args[2:])
 	case "ui":
 		return runUI(os.Args[2:])
+	case "_native":
+		return runNative(os.Args[2:])
 	case "_service_run":
 		return runSavedService(os.Args[2:])
 	case "inspect":
@@ -63,6 +65,13 @@ func run() error {
 		usage()
 		return fmt.Errorf("unknown command %q", os.Args[1])
 	}
+}
+
+func runNative(args []string) error {
+	if len(args) != 1 {
+		return errors.New("native bridge requires exactly one action")
+	}
+	return ui.RunNativeCommand(args[0], os.Stdin, os.Stdout, version)
 }
 
 func runStatus(args []string) error {
