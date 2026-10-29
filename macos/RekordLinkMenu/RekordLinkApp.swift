@@ -720,6 +720,11 @@ private struct RekordLinkView: View {
 
 private struct AppError: Identifiable { let id = UUID(); let message: String }
 
+private func launchedAtLogin(_ event: NSAppleEventDescriptor?) -> Bool {
+    event?.eventID == kAEOpenApplication &&
+        event?.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let model = RekordLinkModel()
     var window: NSWindow!
@@ -760,7 +765,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelega
         updateTimer = Timer.scheduledTimer(withTimeInterval: 24 * 60 * 60, repeats: true) { [weak model] _ in
             if model?.automaticallyChecksForUpdates == true { model?.checkForUpdates(silent: true) }
         }
-        showWindow()
+        if !launchedAtLogin(NSAppleEventManager.shared().currentAppleEvent) {
+            showWindow()
+        }
     }
 
     @objc func showWindow() { window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }

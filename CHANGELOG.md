@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Kept the macOS window closed when launched at login; manual launches and Open RekordLink still show it.
 - Replaced the macOS browser dashboard with a native SwiftUI setup, status, activity, permissions, and update window while retaining the cross-platform CLI dashboard.
 - Added automatic GitHub Release checks and a native one-click updater that verifies SHA-256 checksums, the app signature, and bundle identity before installation and relaunch.
 - Installed the macOS app at a stable per-user Applications path and launched background sync through the app bundle so removable-volume approval follows one visible app identity.
