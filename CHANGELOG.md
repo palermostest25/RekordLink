@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Kept the macOS window closed when launched at login; manual launches and Open RekordLink still show it.
+- Replaced the macOS browser dashboard with a native SwiftUI setup, status, activity, permissions, and update window while retaining the cross-platform CLI dashboard.
+- Added automatic GitHub Release checks and a native one-click updater that verifies SHA-256 checksums, the app signature, and bundle identity before installation and relaunch.
+- Installed the macOS app at a stable per-user Applications path and launched background sync through the app bundle so removable-volume approval follows one visible app identity.
+- Added native Open and Save panels plus removable-volume privacy descriptions, and backed off denied-volume reads and failed LaunchAgent restarts to prevent recurring permission prompts.
 - Replaced the wide macOS menu-bar text label with a standard square sync icon and a compact `RL` fallback.
 - Added a free shared-playlist workflow: each DJ selects their own editable contribution playlist or folder, and RekordLink publishes one de-duplicated `Duo Library` containing both contributions.
 - Kept contribution sources out of the generated per-DJ trees so the imported XML contains one combined playlist rather than duplicate contribution copies.

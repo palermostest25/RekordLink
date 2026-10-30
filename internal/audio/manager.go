@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/rekordlink/rekordlink/internal/library"
 )
@@ -32,6 +33,8 @@ type Manager struct {
 	indexMu   sync.Mutex
 	indexPath string
 	index     map[string]indexEntry
+	accessMu  sync.Mutex
+	blocked   map[string]time.Time
 }
 
 type indexEntry struct {
@@ -63,7 +66,7 @@ func New(root, blobDir string) (*Manager, error) {
 			return nil, err
 		}
 	}
-	m := &Manager{root: absRoot, blobDir: absBlobs, indexPath: filepath.Join(absBlobs, "index.json"), index: make(map[string]indexEntry)}
+	m := &Manager{root: absRoot, blobDir: absBlobs, indexPath: filepath.Join(absBlobs, "index.json"), index: make(map[string]indexEntry), blocked: make(map[string]time.Time)}
 	if b, err := os.ReadFile(m.indexPath); err == nil {
 		if err := json.Unmarshal(b, &m.index); err != nil {
 			return nil, fmt.Errorf("read audio index: %w", err)
@@ -91,8 +94,17 @@ func (m *Manager) Prepare(data []byte) (Prepared, error) {
 		if !ok || !supportedExtensions[strings.ToLower(filepath.Ext(path))] {
 			continue
 		}
+		if until, blocked := m.accessBlocked(path); blocked {
+			if len(warnings) < 100 {
+				warnings = append(warnings, fmt.Sprintf("audio unavailable for %q: removable-volume access was denied; retry after %s or restart RekordLink after granting access", displayName(*track), until.Format(time.Kitchen)))
+			}
+			continue
+		}
 		info, err := os.Stat(path)
 		if err != nil || !info.Mode().IsRegular() {
+			if errors.Is(err, os.ErrPermission) {
+				m.blockAccess(path, time.Now().Add(10*time.Minute))
+			}
 			if len(warnings) < 100 {
 				reason := "not a regular file"
 				if err != nil {
@@ -134,6 +146,35 @@ func (m *Manager) Prepare(data []byte) (Prepared, error) {
 		}
 	}
 	return Prepared{XML: out, Hashes: hashes, Warnings: warnings}, nil
+}
+
+func (m *Manager) accessBlocked(path string) (time.Time, bool) {
+	key := accessScope(path)
+	m.accessMu.Lock()
+	defer m.accessMu.Unlock()
+	until, ok := m.blocked[key]
+	if ok && time.Now().After(until) {
+		delete(m.blocked, key)
+		return time.Time{}, false
+	}
+	return until, ok
+}
+
+func (m *Manager) blockAccess(path string, until time.Time) {
+	m.accessMu.Lock()
+	m.blocked[accessScope(path)] = until
+	m.accessMu.Unlock()
+}
+
+func accessScope(path string) string {
+	clean := filepath.Clean(path)
+	if runtime.GOOS == "darwin" && strings.HasPrefix(clean, "/Volumes/") {
+		parts := strings.Split(strings.TrimPrefix(clean, "/Volumes/"), string(filepath.Separator))
+		if len(parts) > 0 && parts[0] != "" {
+			return filepath.Join("/Volumes", parts[0])
+		}
+	}
+	return clean
 }
 
 // Materialize ensures every content-addressed Location exists in the managed

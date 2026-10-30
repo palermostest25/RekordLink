@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
@@ -25,6 +26,27 @@ func TestValidateListenRequiresLoopback(t *testing.T) {
 		if err := validateListen(address); err == nil {
 			t.Fatalf("expected %s to be rejected", address)
 		}
+	}
+}
+
+func TestNativePlaylistBridge(t *testing.T) {
+	path, err := filepath.Abs(filepath.Join("..", "library", "testdata", "dj-a.xml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	input, _ := json.Marshal(map[string]string{"library": path})
+	var output bytes.Buffer
+	if err := RunNativeCommand("playlists", bytes.NewReader(input), &output, "test"); err != nil {
+		t.Fatal(err)
+	}
+	var response struct {
+		Playlists []library.PlaylistPath `json:"playlists"`
+	}
+	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if len(response.Playlists) == 0 || response.Playlists[0].Path == "" || response.Playlists[0].Label == "" {
+		t.Fatalf("native bridge returned unusable playlists: %#v", response.Playlists)
 	}
 }
 

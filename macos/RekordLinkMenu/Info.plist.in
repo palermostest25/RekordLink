@@ -13,5 +13,7 @@
   <key>LSMinimumSystemVersion</key><string>11.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
+  <key>NSRemovableVolumesUsageDescription</key><string>RekordLink reads your rekordbox library and synchronized music from the drives you choose.</string>
+  <key>NSDocumentsFolderUsageDescription</key><string>RekordLink reads the rekordbox library and music folders you choose.</string>
 </dict>
 </plist>
